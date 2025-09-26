@@ -1,33 +1,45 @@
-# Threat Intelligence Assistant
+# Threat Intelligence Assistant (Concise)
 
-Analyze IPs, domains, and file hashes in a clean web UI. Risk is driven by AlienVault OTX and AbuseIPDB; ML is fallback only.
+Analyze IPs, domains, and file hashes via a simple web UI and REST API. Risk is determined directly from AlienVault OTX and AbuseIPDB; ML is used only as a fallback.
 
 ## Features
-- Simple web app at `http://localhost:5000`
-- Live risk based on OTX pulse_count and AbuseIPDB confidence
-- Clear report with summary, recommendations, and source links
+- Web UI at `http://localhost:5000`
+- `POST /analyze` API returns a structured report
+- Live risk from OTX pulse_count and AbuseIPDB confidence
+- Links to original source reports
 
-## Quick Start
-1) Install deps
+## Install & Run
 ```powershell
 pip install -r requirements.txt
+python app.py
 ```
 
-2) Add `.env` in project root
+## Configure (.env)
 ```env
-# OTX: use either name
+# Either name works for OTX
 ALIENVAULT_API_KEY=your_otx_key
 OTX_API_KEY=your_otx_key
 ABUSEIPDB_API_KEY=your_abuseipdb_key
+OPENAI_API_KEY=    # optional
 FLASK_ENV=development
 FLASK_DEBUG=True
 SECRET_KEY=dev-secret
 ```
 
-3) Run the app
+## Risk Logic (rule-based)
+- High: AbuseIPDB confidence ≥ 70 OR OTX pulse_count ≥ 5
+- Medium: AbuseIPDB confidence ≥ 30 OR OTX pulse_count ≥ 1
+- Low: otherwise
+
+## Quick Test (PowerShell)
 ```powershell
-python app.py
+# Healthy/benign example
+Invoke-RestMethod -Uri "http://localhost:5000/analyze" -Method POST -ContentType "application/json" -Body '{"indicator":"8.8.8.8"}' | ConvertTo-Json -Depth 3
+
+# Likely suspicious example (may vary over time/rate limits)
+Invoke-RestMethod -Uri "http://localhost:5000/analyze" -Method POST -ContentType "application/json" -Body '{"indicator":"185.220.101.1"}' | ConvertTo-Json -Depth 3
 ```
 
-4) Open the UI
-- Browser: `http://localhost:5000`
+## Notes
+- Works without keys (falls back to rule-based/ML with limited signal)
+- OpenAI is optional and only affects narrative summaries
