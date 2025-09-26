@@ -1,22 +1,24 @@
 # Threat Intelligence Assistant
 
-Analyze IPs, domains, and file hashes via a simple web UI and REST API. Risk is determined directly from AlienVault OTX and AbuseIPDB; ML is used only as a fallback.
+A powerful tool that helps users quickly understand whether an IP address, domain, or file hash is potentially dangerous. The Threat Intelligence Assistant automatically gathers data from trusted sources and provides clear, actionable threat reports in seconds.
 
-## Features
-- Web UI at `http://localhost:5000`
-- `POST /analyze` API returns a structured report
-- Live risk from OTX pulse_count and AbuseIPDB confidence
-- Links to original source reports
+## 🎯 Features
 
-## Install & Run
+- Live risk scoring from AlienVault OTX (pulse_count) and AbuseIPDB (confidence)
+- Clear report: summary, recommendations, threat types, and source links
+- Web UI at `http://localhost:5000` and `POST /analyze` API
+- Optional OpenAI summaries (if OPENAI_API_KEY provided)
+
+## 🚀 Quick Start
+
+1) Install
 ```powershell
 pip install -r requirements.txt
-python app.py
 ```
 
-## Configure (.env)
+2) Configure `.env` (project root)
 ```env
-# Either name works for OTX
+# OTX key (either name works)
 ALIENVAULT_API_KEY=your_otx_key
 OTX_API_KEY=your_otx_key
 ABUSEIPDB_API_KEY=your_abuseipdb_key
@@ -26,20 +28,22 @@ FLASK_DEBUG=True
 SECRET_KEY=dev-secret
 ```
 
-## Risk Logic (rule-based)
-- High: AbuseIPDB confidence ≥ 70 OR OTX pulse_count ≥ 5
-- Medium: AbuseIPDB confidence ≥ 30 OR OTX pulse_count ≥ 1
-- Low: otherwise
-
-## Quick Test (PowerShell)
+3) Run
 ```powershell
-# Healthy/benign example
-Invoke-RestMethod -Uri "http://localhost:5000/analyze" -Method POST -ContentType "application/json" -Body '{"indicator":"8.8.8.8"}' | ConvertTo-Json -Depth 3
-
-# Likely suspicious example (may vary over time/rate limits)
-Invoke-RestMethod -Uri "http://localhost:5000/analyze" -Method POST -ContentType "application/json" -Body '{"indicator":"185.220.101.1"}' | ConvertTo-Json -Depth 3
+python app.py
 ```
 
+4) Use
+- Web: open `http://localhost:5000`
+- API (PowerShell):
+```powershell
+Invoke-RestMethod -Uri "http://localhost:5000/analyze" -Method POST -ContentType "application/json" -Body '{"indicator":"8.8.8.8"}' | ConvertTo-Json -Depth 3
+```
+
+## 🧠 Risk Logic (rule-based)
+- High: AbuseIPDB confidence ≥ 70 OR OTX pulse_count ≥ 5
+- Medium: AbuseIPDB confidence ≥ 30 OR OTX pulse_count ≥ 1
+- Low: otherwise (ML is fallback when feeds give no signal)
+
 ## Notes
-- Works without keys (falls back to rule-based/ML with limited signal)
-- OpenAI is optional and only affects narrative summaries
+- Works without keys (reduced fidelity). OpenAI is optional and only affects summaries.
