@@ -1,4 +1,4 @@
-# Threat Intelligence Assistant (Concise)
+# Threat Intelligence Assistant
 
 Analyze IPs, domains, and file hashes via a simple web UI and REST API. Risk is determined directly from AlienVault OTX and AbuseIPDB; ML is used only as a fallback.
 
