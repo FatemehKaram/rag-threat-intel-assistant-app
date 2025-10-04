@@ -261,7 +261,9 @@ class RAGSystem:
             5. Recommendations
             """
             
-            response = self.openai_client.ChatCompletion.create(
+            # Use the new OpenAI client API
+            client = openai.OpenAI(api_key=app.config['OPENAI_API_KEY'])
+            response = client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=500,
@@ -660,13 +662,23 @@ def chat():
 def generate_chat_response(message: str, analysis_results: Optional[Dict[str, Any]]) -> str:
     """Generate contextual chat response using LLM when available, fallback to rule-based"""
     
+    # Check if OpenAI API key is available
+    openai_key = app.config.get('OPENAI_API_KEY', '')
+    logger.info(f"OpenAI API key available: {bool(openai_key and openai_key.strip())}")
+    
     # Try to use LLM first if available
-    if app.config['OPENAI_API_KEY']:
+    if openai_key and openai_key.strip():
         try:
-            return generate_llm_chat_response(message, analysis_results)
+            logger.info("Attempting to use LLM for chat response")
+            response = generate_llm_chat_response(message, analysis_results)
+            logger.info("LLM response generated successfully")
+            return response
         except Exception as e:
             logger.error(f"LLM chat error: {str(e)}")
+            logger.info("Falling back to rule-based response")
             # Fall back to rule-based response
+    else:
+        logger.info("No OpenAI API key available, using rule-based response")
     
     # Fallback to rule-based responses
     return generate_rule_based_chat_response(message, analysis_results)
@@ -674,10 +686,28 @@ def generate_chat_response(message: str, analysis_results: Optional[Dict[str, An
 def generate_llm_chat_response(message: str, analysis_results: Optional[Dict[str, Any]]) -> str:
     """Generate intelligent chat response using OpenAI LLM"""
     
-    # Create system prompt
-    system_prompt = """You are a helpful cybersecurity expert assistant specializing in threat intelligence analysis. 
-    You help users understand threat indicators, risk assessments, and provide cybersecurity guidance. 
-    Be conversational, professional, and concise in your responses (2-3 sentences max)."""
+    # Ensure OpenAI API key is set
+    openai_key = app.config.get('OPENAI_API_KEY', '')
+    if openai_key:
+        openai.api_key = openai_key
+    
+    # Determine if this is a cybersecurity-related question
+    cybersecurity_keywords = [
+        'threat', 'security', 'cyber', 'malware', 'virus', 'hack', 'attack', 'breach',
+        'firewall', 'vulnerability', 'exploit', 'phishing', 'ransomware', 'botnet',
+        'ip', 'domain', 'hash', 'indicator', 'risk', 'analysis', 'intelligence',
+        'network', 'system', 'data', 'privacy', 'encryption', 'password', 'auth',
+        'app', 'application', 'platform', 'tool', 'what does', 'what is this'
+    ]
+    
+    message_lower = message.lower()
+    is_cybersecurity_question = any(keyword in message_lower for keyword in cybersecurity_keywords)
+    
+    # Create system prompt based on question type
+    if is_cybersecurity_question or analysis_results:
+        system_prompt = """You are an AI assistant integrated into a Threat Intelligence Analysis platform. You specialize in cybersecurity and threat intelligence analysis, but can also answer general questions. You help users understand threat analysis results, provide cybersecurity guidance, and assist with various topics. Be conversational, professional, and concise (2-4 sentences max)."""
+    else:
+        system_prompt = """You are an AI assistant integrated into a Threat Intelligence Analysis platform. While you can answer general questions on many topics, you are primarily designed to help with cybersecurity and threat intelligence analysis. You can analyze IP addresses, domains, and file hashes for threats. Be conversational, informative, and concise (2-4 sentences max). When users ask about the app, explain that this is a threat intelligence platform for analyzing potential security threats."""
     
     # Create context based on whether analysis results are available
     if analysis_results:
@@ -707,41 +737,49 @@ def generate_llm_chat_response(message: str, analysis_results: Optional[Dict[str
         User Question: "{message}"
         
         Instructions:
-        1. Answer based on the analysis data when relevant
-        2. If asked about something not in the data, say so politely
-        3. Use specific data from the analysis when applicable
-        4. Be helpful and educational about cybersecurity concepts
+        1. If the question relates to the analysis results, use that data
+        2. If it's a general cybersecurity question, provide expert guidance
+        3. If it's a non-cybersecurity question, answer helpfully
+        4. Be conversational and educational
         """
     else:
-        # No analysis results - handle general cybersecurity questions
+        # No analysis results - handle any type of question
         context = f"""
         User Question: "{message}"
         
-        Context: The user is asking a general question about cybersecurity or threat intelligence. 
-        No specific threat analysis is currently available.
+        Context: You are integrated into a Threat Intelligence Analysis platform that helps users analyze IP addresses, domains, and file hashes for potential security threats. The platform uses multiple threat intelligence sources and AI-powered analysis.
         
         Instructions:
-        1. Provide helpful cybersecurity guidance and information
-        2. If they ask about analyzing threats, guide them to use the main interface
-        3. Be educational about cybersecurity best practices
-        4. Keep responses concise and actionable
+        1. If asked about the app/platform, explain it's a threat intelligence analysis tool
+        2. If it's about cybersecurity, provide expert guidance
+        3. If it's about threat analysis, guide them to use the main interface to analyze indicators
+        4. For other topics, provide general helpful information
+        5. Be conversational and informative
+        6. Always remember you're part of a threat intelligence platform
         """
     
     try:
-        response = openai.ChatCompletion.create(
+        logger.info(f"Sending request to OpenAI with message: {message[:50]}...")
+        
+        # Use the new OpenAI client API
+        client = openai.OpenAI(api_key=openai_key)
+        response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": context}
             ],
-            max_tokens=250,
+            max_tokens=300,
             temperature=0.7
         )
         
-        return response.choices[0].message.content.strip()
+        result = response.choices[0].message.content.strip()
+        logger.info(f"OpenAI response received: {result[:50]}...")
+        return result
         
     except Exception as e:
         logger.error(f"OpenAI API error in chat: {str(e)}")
+        logger.error(f"Error type: {type(e).__name__}")
         raise e
 
 def generate_rule_based_chat_response(message: str, analysis_results: Optional[Dict[str, Any]]) -> str:
@@ -751,12 +789,33 @@ def generate_rule_based_chat_response(message: str, analysis_results: Optional[D
     
     # If no analysis results available
     if not analysis_results:
-        if any(word in message_lower for word in ['analyze', 'check', 'threat', 'indicator']):
+        # Greeting responses
+        if any(word in message_lower for word in ['hello', 'hi', 'hey', 'good morning', 'good afternoon', 'good evening']):
+            return "Hello! I'm your AI assistant. I can help with threat intelligence analysis and answer general questions. Try analyzing a threat indicator or ask me anything!"
+        
+        # Threat analysis related
+        elif any(word in message_lower for word in ['analyze', 'check', 'threat', 'indicator', 'ip', 'domain', 'hash']):
             return "I'd be happy to help you analyze a threat indicator! Please enter an IP address, domain, or file hash in the main interface to get started."
-        elif any(word in message_lower for word in ['hello', 'hi', 'hey']):
-            return "Hello! I'm your threat intelligence assistant. I can help you understand threat analysis results and answer questions about cybersecurity. Try analyzing a threat indicator first!"
+        
+        # Cybersecurity questions
+        elif any(word in message_lower for word in ['security', 'cyber', 'malware', 'virus', 'hack', 'attack', 'breach', 'firewall']):
+            return "I can help with cybersecurity questions! For threat analysis, use the main interface. For general security advice, I can provide guidance based on best practices."
+        
+        # General knowledge questions
+        elif any(word in message_lower for word in ['what is', 'what are', 'how does', 'how do', 'why is', 'why are', 'explain', 'tell me about']):
+            return "I'd be happy to explain that! However, I'm currently running in a limited mode. For detailed explanations and general knowledge questions, please ensure you have an OpenAI API key configured in your .env file to enable full AI capabilities."
+        
+        # Weather, time, etc.
+        elif any(word in message_lower for word in ['weather', 'time', 'date', 'temperature']):
+            return "I can help with general questions, but for real-time information like weather or current time, you might want to check a dedicated service. Is there anything else I can help you with?"
+        
+        # Questions starting with what, how, why, etc.
+        elif any(word in message_lower for word in ['what', 'how', 'why', 'when', 'where', 'who']):
+            return "I'm here to help! I can answer questions about threat intelligence, cybersecurity, and general topics. For detailed explanations, please ensure you have an OpenAI API key configured to enable full AI capabilities."
+        
+        # Default response
         else:
-            return "I'm here to help with threat intelligence analysis. Please analyze a threat indicator first, then I can answer questions about the results!"
+            return "I'm here to help! I can assist with threat intelligence analysis, cybersecurity questions, and general topics. For comprehensive answers, please ensure you have an OpenAI API key configured in your .env file."
     
     # Context-aware responses based on analysis results
     indicator = analysis_results.get('indicator', {})
@@ -811,6 +870,49 @@ def health():
         'timestamp': datetime.now().isoformat(),
         'version': '1.0.0'
     })
+
+@app.route('/debug/chat-config')
+def debug_chat_config():
+    """Debug endpoint to check chat configuration"""
+    openai_key = app.config.get('OPENAI_API_KEY', '')
+    return jsonify({
+        'openai_key_configured': bool(openai_key and openai_key.strip()),
+        'openai_key_length': len(openai_key) if openai_key else 0,
+        'openai_key_prefix': openai_key[:10] + '...' if openai_key and len(openai_key) > 10 else openai_key,
+        'config_source': 'environment' if openai_key else 'not_found'
+    })
+
+@app.route('/debug/test-llm')
+def debug_test_llm():
+    """Debug endpoint to test LLM functionality"""
+    try:
+        openai_key = app.config.get('OPENAI_API_KEY', '')
+        if not openai_key or not openai_key.strip():
+            return jsonify({'error': 'No OpenAI API key configured'})
+        
+        # Test simple LLM call with new API
+        client = openai.OpenAI(api_key=openai_key)
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": "Say hello in one sentence."}
+            ],
+            max_tokens=50,
+            temperature=0.7
+        )
+        
+        return jsonify({
+            'success': True,
+            'response': response.choices[0].message.content.strip(),
+            'model': 'gpt-3.5-turbo'
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'error': str(e),
+            'error_type': type(e).__name__
+        })
 
 if __name__ == '__main__':
     # Create necessary directories
