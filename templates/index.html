@@ -720,7 +720,7 @@
             <div class="chatbot-messages" id="chatbotMessages">
                 <div class="chatbot-message message-bot">
                     <div class="message-bubble">
-                        Hello! I'm your threat intelligence assistant. I can help you understand threat analysis results and answer questions about cybersecurity threats. Try analyzing a threat indicator first, then ask me anything about the results!
+                        Hello! I'm your AI-powered threat intelligence assistant. I can help you understand threat analysis results, answer cybersecurity questions, and provide expert guidance. Try analyzing a threat indicator first, then ask me anything about the results or general cybersecurity topics!
                     </div>
                     <div class="message-time" id="welcomeTime"></div>
                 </div>
@@ -958,7 +958,7 @@
             const resultsDiv = document.getElementById('results');
             
             // Notify chatbot about new analysis results
-            addMessageToChat(`I've just analyzed ${report.indicator.value} (${report.indicator.indicator_type.toUpperCase()}) and found it has a ${report.risk_level} risk level. Ask me anything about the results!`, 'bot');
+            addMessageToChat(`I've just analyzed ${report.indicator.value} (${report.indicator.indicator_type.toUpperCase()}) and found it has a ${report.risk_level} risk level with a ${(report.risk_score * 100).toFixed(1)}% risk score. Ask me anything about the results or cybersecurity in general!`, 'bot');
             
             resultsDiv.innerHTML = `
                 <div class="report-section">

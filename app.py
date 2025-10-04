@@ -658,7 +658,94 @@ def chat():
         return jsonify({'error': 'Chat failed. Please try again.'}), 500
 
 def generate_chat_response(message: str, analysis_results: Optional[Dict[str, Any]]) -> str:
-    """Generate contextual chat response based on message and analysis results"""
+    """Generate contextual chat response using LLM when available, fallback to rule-based"""
+    
+    # Try to use LLM first if available
+    if app.config['OPENAI_API_KEY']:
+        try:
+            return generate_llm_chat_response(message, analysis_results)
+        except Exception as e:
+            logger.error(f"LLM chat error: {str(e)}")
+            # Fall back to rule-based response
+    
+    # Fallback to rule-based responses
+    return generate_rule_based_chat_response(message, analysis_results)
+
+def generate_llm_chat_response(message: str, analysis_results: Optional[Dict[str, Any]]) -> str:
+    """Generate intelligent chat response using OpenAI LLM"""
+    
+    # Create system prompt
+    system_prompt = """You are a helpful cybersecurity expert assistant specializing in threat intelligence analysis. 
+    You help users understand threat indicators, risk assessments, and provide cybersecurity guidance. 
+    Be conversational, professional, and concise in your responses (2-3 sentences max)."""
+    
+    # Create context based on whether analysis results are available
+    if analysis_results:
+        # Extract analysis data
+        indicator = analysis_results.get('indicator', {})
+        risk_level = analysis_results.get('risk_level', 'Unknown')
+        risk_score = analysis_results.get('risk_score', 0)
+        threat_types = analysis_results.get('threat_types', [])
+        summary = analysis_results.get('summary', '')
+        detailed_analysis = analysis_results.get('detailed_analysis', '')
+        recommendations = analysis_results.get('recommendations', [])
+        confidence = analysis_results.get('confidence', 0)
+        source_links = analysis_results.get('source_links', [])
+        
+        context = f"""
+        Current Threat Analysis Results:
+        - Indicator: {indicator.get('value', 'N/A')} ({indicator.get('indicator_type', 'unknown').upper()})
+        - Risk Level: {risk_level}
+        - Risk Score: {risk_score:.2f} ({int(risk_score * 100)}%)
+        - Threat Types: {', '.join(threat_types) if threat_types else 'None identified'}
+        - Summary: {summary}
+        - Detailed Analysis: {detailed_analysis}
+        - Recommendations: {'; '.join(recommendations) if recommendations else 'None provided'}
+        - Confidence: {confidence:.2f} ({int(confidence * 100)}%)
+        - Sources: {len(source_links)} threat intelligence sources consulted
+        
+        User Question: "{message}"
+        
+        Instructions:
+        1. Answer based on the analysis data when relevant
+        2. If asked about something not in the data, say so politely
+        3. Use specific data from the analysis when applicable
+        4. Be helpful and educational about cybersecurity concepts
+        """
+    else:
+        # No analysis results - handle general cybersecurity questions
+        context = f"""
+        User Question: "{message}"
+        
+        Context: The user is asking a general question about cybersecurity or threat intelligence. 
+        No specific threat analysis is currently available.
+        
+        Instructions:
+        1. Provide helpful cybersecurity guidance and information
+        2. If they ask about analyzing threats, guide them to use the main interface
+        3. Be educational about cybersecurity best practices
+        4. Keep responses concise and actionable
+        """
+    
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": context}
+            ],
+            max_tokens=250,
+            temperature=0.7
+        )
+        
+        return response.choices[0].message.content.strip()
+        
+    except Exception as e:
+        logger.error(f"OpenAI API error in chat: {str(e)}")
+        raise e
+
+def generate_rule_based_chat_response(message: str, analysis_results: Optional[Dict[str, Any]]) -> str:
+    """Generate rule-based chat response as fallback"""
     
     message_lower = message.lower()
     
