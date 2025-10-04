@@ -595,6 +595,9 @@ class ThreatAnalysisEngine:
 # Initialize the analysis engine
 analysis_engine = ThreatAnalysisEngine()
 
+# Global variable to store current analysis results for chatbot context
+current_analysis_results = None
+
 @app.route('/')
 def index():
     """Main page"""
@@ -603,6 +606,7 @@ def index():
 @app.route('/analyze', methods=['POST'])
 def analyze():
     """Analyze a threat indicator"""
+    global current_analysis_results
     try:
         data = request.get_json()
         indicator_value = data.get('indicator', '').strip()
@@ -616,6 +620,9 @@ def analyze():
         # Convert to JSON-serializable format
         report_dict = asdict(report)
         
+        # Store results for chatbot context
+        current_analysis_results = report_dict
+        
         return jsonify({
             'success': True,
             'report': report_dict
@@ -626,6 +633,88 @@ def analyze():
     except Exception as e:
         logger.error(f"Analysis error: {str(e)}")
         return jsonify({'error': 'Analysis failed. Please try again.'}), 500
+
+@app.route('/chat', methods=['POST'])
+def chat():
+    """Handle chatbot messages"""
+    global current_analysis_results
+    try:
+        data = request.get_json()
+        message = data.get('message', '').strip()
+        
+        if not message:
+            return jsonify({'error': 'No message provided'}), 400
+        
+        # Generate response based on current analysis results
+        response = generate_chat_response(message, current_analysis_results)
+        
+        return jsonify({
+            'success': True,
+            'response': response
+        })
+        
+    except Exception as e:
+        logger.error(f"Chat error: {str(e)}")
+        return jsonify({'error': 'Chat failed. Please try again.'}), 500
+
+def generate_chat_response(message: str, analysis_results: Optional[Dict[str, Any]]) -> str:
+    """Generate contextual chat response based on message and analysis results"""
+    
+    message_lower = message.lower()
+    
+    # If no analysis results available
+    if not analysis_results:
+        if any(word in message_lower for word in ['analyze', 'check', 'threat', 'indicator']):
+            return "I'd be happy to help you analyze a threat indicator! Please enter an IP address, domain, or file hash in the main interface to get started."
+        elif any(word in message_lower for word in ['hello', 'hi', 'hey']):
+            return "Hello! I'm your threat intelligence assistant. I can help you understand threat analysis results and answer questions about cybersecurity. Try analyzing a threat indicator first!"
+        else:
+            return "I'm here to help with threat intelligence analysis. Please analyze a threat indicator first, then I can answer questions about the results!"
+    
+    # Context-aware responses based on analysis results
+    indicator = analysis_results.get('indicator', {})
+    risk_level = analysis_results.get('risk_level', 'Unknown')
+    risk_score = analysis_results.get('risk_score', 0)
+    threat_types = analysis_results.get('threat_types', [])
+    summary = analysis_results.get('summary', '')
+    recommendations = analysis_results.get('recommendations', [])
+    
+    # Risk level questions
+    if any(word in message_lower for word in ['risk', 'dangerous', 'safe', 'threat']):
+        risk_percentage = int(risk_score * 100)
+        if risk_level == 'High':
+            return f"The {indicator.get('indicator_type', 'indicator')} {indicator.get('value', '')} has a HIGH risk level with a {risk_percentage}% risk score. This indicates significant threat activity and should be treated with caution."
+        elif risk_level == 'Medium':
+            return f"The {indicator.get('indicator_type', 'indicator')} {indicator.get('value', '')} has a MEDIUM risk level with a {risk_percentage}% risk score. It shows some suspicious activity and should be monitored closely."
+        else:
+            return f"The {indicator.get('indicator_type', 'indicator')} {indicator.get('value', '')} has a LOW risk level with a {risk_percentage}% risk score. It appears to be relatively safe based on current threat intelligence."
+    
+    # Threat types questions
+    if any(word in message_lower for word in ['type', 'kind', 'category', 'malware', 'attack']):
+        if threat_types and threat_types != ['Unknown']:
+            threat_list = ', '.join(threat_types[:3])  # Show top 3
+            return f"This indicator has been associated with the following threat types: {threat_list}. This information comes from threat intelligence feeds and security research."
+        else:
+            return "No specific threat types have been identified for this indicator, or the threat type information is not available in our current data sources."
+    
+    # Recommendations questions
+    if any(word in message_lower for word in ['recommend', 'should', 'action', 'do', 'next']):
+        if recommendations:
+            rec_list = '; '.join(recommendations[:3])  # Show top 3
+            return f"Based on the analysis, here are the key recommendations: {rec_list}"
+        else:
+            return "Based on the risk assessment, I recommend monitoring this indicator and taking appropriate security measures based on your organization's policies."
+    
+    # Summary questions
+    if any(word in message_lower for word in ['summary', 'overview', 'explain', 'what', 'tell me']):
+        return f"Here's the analysis summary: {summary}"
+    
+    # General questions about the indicator
+    if any(word in message_lower for word in ['indicator', 'ip', 'domain', 'hash', 'address']):
+        return f"I analyzed the {indicator.get('indicator_type', 'indicator')} '{indicator.get('value', '')}' and found it has a {risk_level} risk level. {summary}"
+    
+    # Default response
+    return f"I can help you understand the analysis results for {indicator.get('value', 'the current indicator')}. You can ask me about the risk level, threat types, recommendations, or request a summary. What would you like to know?"
 
 @app.route('/health')
 def health():
