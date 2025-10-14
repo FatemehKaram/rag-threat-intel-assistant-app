@@ -1,243 +1,410 @@
+# Import Flask web framework components for building the web application
 from flask import Flask, render_template, request, jsonify, flash, redirect, url_for
+# Import operating system interface for file and directory operations
 import os
+# Import JSON handling for data serialization and file storage
 import json
+# Import logging for application monitoring and debugging
 import logging
+# Import datetime for timestamp handling
 from datetime import datetime
+# Import type hints for better code documentation and IDE support
 from typing import Dict, List, Optional, Any
+# Import requests for making HTTP API calls to threat intelligence sources
 import requests
+# Import dataclass decorator for creating structured data classes
 from dataclasses import dataclass, asdict
+# Import regular expressions for pattern matching and validation
 import re
+# Import hashlib for hash validation and processing
 import hashlib
+# Import ipaddress for IP address validation and manipulation
 import ipaddress
+# Import urlparse for URL parsing and validation
 from urllib.parse import urlparse
+# Import OpenAI for AI-powered threat intelligence synthesis
 import openai
+# Import scikit-learn components for machine learning-based risk assessment
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.ensemble import RandomForestClassifier
+# Import joblib for saving and loading machine learning models
 import joblib
+# Import numpy for numerical operations
 import numpy as np
+# Import our custom configuration module
 from config import config
 
-# Configure logging
+# Configure logging system to write to both file and console
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO,  # Set logging level to INFO (captures info, warning, error messages)
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',  # Define log message format
     handlers=[
-        logging.FileHandler('logs/app.log'),
-        logging.StreamHandler()
+        logging.FileHandler('logs/app.log'),  # Write logs to file
+        logging.StreamHandler()  # Also display logs in console
     ]
 )
+# Create a logger instance for this module
 logger = logging.getLogger(__name__)
 
+# Create Flask application instance
 app = Flask(__name__)
 
-# Load configuration
-config_name = os.environ.get('FLASK_ENV', 'development')
-app.config.from_object(config[config_name])
+# Load configuration based on environment (development/production)
+config_name = os.environ.get('FLASK_ENV', 'development')  # Get environment from env var, default to development
+app.config.from_object(config[config_name])  # Apply configuration to Flask app
 
 @dataclass
 class ThreatIndicator:
     """Represents a threat indicator (IP, domain, or hash)"""
-    value: str
-    indicator_type: str  # 'ip', 'domain', 'hash'
-    confidence: float = 0.0
-    first_seen: Optional[str] = None
-    last_seen: Optional[str] = None
-    sources: List[str] = None
+    value: str  # The actual indicator value (e.g., "192.168.1.1", "malicious.com", "abc123...")
+    indicator_type: str  # Type of indicator: 'ip', 'domain', or 'hash'
+    confidence: float = 0.0  # Confidence score for this indicator (0.0 to 1.0)
+    first_seen: Optional[str] = None  # ISO timestamp when first observed
+    last_seen: Optional[str] = None  # ISO timestamp when last observed
+    sources: List[str] = None  # List of threat intelligence sources that reported this indicator
     
     def __post_init__(self):
+        # Initialize sources list if it's None (dataclass default handling)
         if self.sources is None:
             self.sources = []
 
 @dataclass
 class ThreatReport:
     """Represents a comprehensive threat analysis report"""
-    indicator: ThreatIndicator
-    risk_level: str  # 'Low', 'Medium', 'High'
-    risk_score: float  # 0.0 to 1.0
-    threat_types: List[str]
-    summary: str
-    detailed_analysis: str
-    recommendations: List[str]
-    source_links: List[Dict[str, str]]
-    analysis_timestamp: str
-    confidence: float
+    indicator: ThreatIndicator  # The threat indicator that was analyzed
+    risk_level: str  # Risk assessment: 'Low', 'Medium', or 'High'
+    risk_score: float  # Numerical risk score from 0.0 (safe) to 1.0 (very dangerous)
+    threat_types: List[str]  # List of threat categories (e.g., ["malware", "botnet", "phishing"])
+    summary: str  # AI-generated brief summary of the threat
+    detailed_analysis: str  # Comprehensive AI analysis of the threat
+    recommendations: List[str]  # AI-generated security recommendations
+    source_links: List[Dict[str, str]]  # Links to original threat intelligence reports
+    analysis_timestamp: str  # ISO timestamp when this analysis was performed
+    confidence: float  # Overall confidence in the analysis (0.0 to 1.0)
 
 class ThreatIntelligenceAPI:
     """Handles API calls to various threat intelligence sources"""
     
     def __init__(self):
+        # Set base URL for AlienVault OTX (Open Threat Exchange) API
         self.alienvault_base = "https://otx.alienvault.com/api/v1"
+        # Set base URL for AbuseIPDB API for IP reputation checking
         self.abuseipdb_base = "https://api.abuseipdb.com/api/v2"
         
     def check_ip_alienvault(self, ip_address: str) -> Dict[str, Any]:
         """Check IP address against AlienVault OTX"""
         try:
+            # Check if API key is configured, return default response if not
             if not app.config['ALIENVAULT_API_KEY']:
                 return {"source": "AlienVault OTX", "malicious": False, "pulse_count": 0, "pulses": [], "url": f"https://otx.alienvault.com/indicator/ip/{ip_address}", "note": "API key not configured"}
                 
+            # Set up API headers with the required API key
             headers = {'X-OTX-API-KEY': app.config['ALIENVAULT_API_KEY']}
+            # Construct the API endpoint URL for IP lookup
             url = f"{self.alienvault_base}/indicators/IPv4/{ip_address}/general"
             
+            # Make HTTP GET request to AlienVault API with 10-second timeout
             response = requests.get(url, headers=headers, timeout=10)
+            # Raise exception if HTTP status code indicates an error
             response.raise_for_status()
             
+            # Parse JSON response from the API
             data = response.json()
+            # Return structured data about the IP address
             return {
-                "source": "AlienVault OTX",
-                "malicious": data.get('pulse_info', {}).get('count', 0) > 0,
-                "pulse_count": data.get('pulse_info', {}).get('count', 0),
-                "pulses": data.get('pulse_info', {}).get('pulses', []),
-                "url": f"https://otx.alienvault.com/indicator/ip/{ip_address}"
+                "source": "AlienVault OTX",  # Source identifier
+                "malicious": data.get('pulse_info', {}).get('count', 0) > 0,  # True if any threat pulses found
+                "pulse_count": data.get('pulse_info', {}).get('count', 0),  # Number of threat pulses
+                "pulses": data.get('pulse_info', {}).get('pulses', []),  # Detailed pulse information
+                "url": f"https://otx.alienvault.com/indicator/ip/{ip_address}"  # Link to detailed report
             }
         except Exception as e:
+            # Log any errors and return error information
             logger.error(f"AlienVault API error for {ip_address}: {str(e)}")
             return {"error": str(e)}
     
     def check_ip_abuseipdb(self, ip_address: str) -> Dict[str, Any]:
         """Check IP address against AbuseIPDB"""
         try:
+            # Check if API key is configured, return default response if not
             if not app.config['ABUSEIPDB_API_KEY']:
                 return {"source": "AbuseIPDB", "malicious": False, "confidence": 0, "usage_type": "Unknown", "country": "Unknown", "isp": "Unknown", "reports": 0, "url": f"https://www.abuseipdb.com/check/{ip_address}", "note": "API key not configured"}
                 
+            # Set up API headers with the required API key and content type
             headers = {'Key': app.config['ABUSEIPDB_API_KEY'], 'Accept': 'application/json'}
+            # Set up query parameters for the API request
             params = {'ipAddress': ip_address, 'maxAgeInDays': 90, 'verbose': ''}
             
+            # Make HTTP GET request to AbuseIPDB API with parameters and timeout
             response = requests.get(f"{self.abuseipdb_base}/check", 
                                   headers=headers, params=params, timeout=10)
+            # Raise exception if HTTP status code indicates an error
             response.raise_for_status()
             
+            # Parse JSON response from the API
             data = response.json()
+            # Extract the data section from the response
             result = data.get('data', {})
             
+            # Return structured data about the IP address
             return {
-                "source": "AbuseIPDB",
-                "malicious": result.get('abuseConfidencePercentage', 0) > 0,
-                "confidence": result.get('abuseConfidencePercentage', 0),
-                "usage_type": result.get('usageType', 'Unknown'),
-                "country": result.get('countryCode', 'Unknown'),
-                "isp": result.get('isp', 'Unknown'),
-                "reports": result.get('totalReports', 0),
-                "url": f"https://www.abuseipdb.com/check/{ip_address}"
+                "source": "AbuseIPDB",  # Source identifier
+                "malicious": result.get('abuseConfidencePercentage', 0) > 0,  # True if abuse confidence > 0%
+                "confidence": result.get('abuseConfidencePercentage', 0),  # Abuse confidence percentage (0-100)
+                "usage_type": result.get('usageType', 'Unknown'),  # Type of usage (hosting, isp, etc.)
+                "country": result.get('countryCode', 'Unknown'),  # Country code where IP is located
+                "isp": result.get('isp', 'Unknown'),  # Internet Service Provider
+                "reports": result.get('totalReports', 0),  # Total number of abuse reports
+                "url": f"https://www.abuseipdb.com/check/{ip_address}"  # Link to detailed report
             }
         except Exception as e:
+            # Log any errors and return error information
             logger.error(f"AbuseIPDB API error for {ip_address}: {str(e)}")
             return {"error": str(e)}
     
     def check_domain_alienvault(self, domain: str) -> Dict[str, Any]:
         """Check domain against AlienVault OTX"""
         try:
+            # Check if API key is configured, return default response if not
             if not app.config['ALIENVAULT_API_KEY']:
                 return {"source": "AlienVault OTX", "malicious": False, "pulse_count": 0, "pulses": [], "url": f"https://otx.alienvault.com/indicator/domain/{domain}", "note": "API key not configured"}
                 
+            # Set up API headers with the required API key
             headers = {'X-OTX-API-KEY': app.config['ALIENVAULT_API_KEY']}
+            # Construct the API endpoint URL for domain lookup
             url = f"{self.alienvault_base}/indicators/domain/{domain}/general"
             
+            # Make HTTP GET request to AlienVault API with 10-second timeout
             response = requests.get(url, headers=headers, timeout=10)
+            # Raise exception if HTTP status code indicates an error
             response.raise_for_status()
             
+            # Parse JSON response from the API
             data = response.json()
+            # Return structured data about the domain
             return {
-                "source": "AlienVault OTX",
-                "malicious": data.get('pulse_info', {}).get('count', 0) > 0,
-                "pulse_count": data.get('pulse_info', {}).get('count', 0),
-                "pulses": data.get('pulse_info', {}).get('pulses', []),
-                "url": f"https://otx.alienvault.com/indicator/domain/{domain}"
+                "source": "AlienVault OTX",  # Source identifier
+                "malicious": data.get('pulse_info', {}).get('count', 0) > 0,  # True if any threat pulses found
+                "pulse_count": data.get('pulse_info', {}).get('count', 0),  # Number of threat pulses
+                "pulses": data.get('pulse_info', {}).get('pulses', []),  # Detailed pulse information
+                "url": f"https://otx.alienvault.com/indicator/domain/{domain}"  # Link to detailed report
             }
         except Exception as e:
+            # Log any errors and return error information
             logger.error(f"AlienVault domain API error for {domain}: {str(e)}")
             return {"error": str(e)}
     
     def check_hash_alienvault(self, file_hash: str) -> Dict[str, Any]:
         """Check file hash against AlienVault OTX"""
         try:
+            # Check if API key is configured, return default response if not
             if not app.config['ALIENVAULT_API_KEY']:
                 return {"source": "AlienVault OTX", "malicious": False, "pulse_count": 0, "pulses": [], "url": f"https://otx.alienvault.com/indicator/file/{file_hash}", "note": "API key not configured"}
                 
+            # Set up API headers with the required API key
             headers = {'X-OTX-API-KEY': app.config['ALIENVAULT_API_KEY']}
+            # Construct the API endpoint URL for file hash lookup
             url = f"{self.alienvault_base}/indicators/file/{file_hash}/general"
             
+            # Make HTTP GET request to AlienVault API with 10-second timeout
             response = requests.get(url, headers=headers, timeout=10)
+            # Raise exception if HTTP status code indicates an error
             response.raise_for_status()
             
+            # Parse JSON response from the API
             data = response.json()
+            # Return structured data about the file hash
             return {
-                "source": "AlienVault OTX",
-                "malicious": data.get('pulse_info', {}).get('count', 0) > 0,
-                "pulse_count": data.get('pulse_info', {}).get('count', 0),
-                "pulses": data.get('pulse_info', {}).get('pulses', []),
-                "url": f"https://otx.alienvault.com/indicator/file/{file_hash}"
+                "source": "AlienVault OTX",  # Source identifier
+                "malicious": data.get('pulse_info', {}).get('count', 0) > 0,  # True if any threat pulses found
+                "pulse_count": data.get('pulse_info', {}).get('count', 0),  # Number of threat pulses
+                "pulses": data.get('pulse_info', {}).get('pulses', []),  # Detailed pulse information
+                "url": f"https://otx.alienvault.com/indicator/file/{file_hash}"  # Link to detailed report
             }
         except Exception as e:
+            # Log any errors and return error information
             logger.error(f"AlienVault hash API error for {file_hash}: {str(e)}")
             return {"error": str(e)}
+
+class ThreatDataStorage:
+    """Handles local storage of threat intelligence data"""
+    
+    def __init__(self, storage_dir="threat_data"):
+        # Set the directory where threat data files will be stored
+        self.storage_dir = storage_dir
+        # Create the directory if it doesn't exist (exist_ok=True prevents error if already exists)
+        os.makedirs(storage_dir, exist_ok=True)
+    
+    def save_threat_data(self, indicator: ThreatIndicator, raw_data: List[Dict[str, Any]], analysis: ThreatReport):
+        """Save threat data to file"""
+        # Create filename by combining indicator type and value, replacing special characters
+        # Example: "ip_8.8.8.8.json" or "domain_example.com.json"
+        filename = f"{indicator.indicator_type}_{indicator.value.replace('/', '_').replace(':', '_')}.json"
+        # Create full file path by joining directory and filename
+        filepath = os.path.join(self.storage_dir, filename)
+        
+        # Try to load existing data for this indicator, or return None if no file exists
+        existing_data = self.load_threat_data(indicator) or {}
+        
+        # Update the existing data dictionary with new information
+        existing_data.update({
+            # Store the indicator information (IP, domain, or hash details)
+            "indicator": asdict(indicator),
+            # Record when this data was last updated (current timestamp)
+            "last_updated": datetime.now().isoformat(),
+            # Increment the counter of how many times this indicator has been analyzed
+            "analysis_count": existing_data.get("analysis_count", 0) + 1,
+            # Store the raw data from threat intelligence APIs
+            "raw_data": raw_data,
+            # Store the latest analysis results
+            "latest_analysis": asdict(analysis),
+            # Keep a history of analyses (last 10), adding the new one to the end
+            "historical_analyses": existing_data.get("historical_analyses", [])[-9:] + [asdict(analysis)]
+        })
+        
+        # Write the updated data to the JSON file
+        with open(filepath, 'w') as f:
+            # Convert Python dictionary to JSON format with 2-space indentation for readability
+            json.dump(existing_data, f, indent=2)
+        
+        # Log that the data was successfully saved
+        logger.info(f"Saved threat data for {indicator.value} to {filepath}")
+    
+    def load_threat_data(self, indicator: ThreatIndicator) -> Optional[Dict[str, Any]]:
+        """Load existing threat data"""
+        # Create the same filename format as in save_threat_data
+        filename = f"{indicator.indicator_type}_{indicator.value.replace('/', '_').replace(':', '_')}.json"
+        # Create full file path
+        filepath = os.path.join(self.storage_dir, filename)
+        
+        # Check if the file exists
+        if os.path.exists(filepath):
+            try:
+                # Open the file for reading
+                with open(filepath, 'r') as f:
+                    # Convert JSON data back to Python dictionary
+                    return json.load(f)
+            except Exception as e:
+                # If there's an error reading the file, log it and return None
+                logger.error(f"Error loading threat data from {filepath}: {str(e)}")
+        # Return None if file doesn't exist or there was an error
+        return None
+    
+    def _merge_threat_data(self, historical_data: List[Dict[str, Any]], new_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Merge historical and new threat data"""
+        # Create empty list to store merged data
+        merged_data = []
+        # Keep track of which data sources we've already included
+        sources_seen = set()
+        
+        # First, add all historical data
+        for data in historical_data:
+            # Get the source name (e.g., "AlienVault OTX", "AbuseIPDB")
+            source = data.get("source", "Unknown")
+            # Only add if we haven't seen this source before
+            if source not in sources_seen:
+                merged_data.append(data)
+                sources_seen.add(source)
+        
+        # Then, add new data that we haven't seen before
+        for data in new_data:
+            # Get the source name
+            source = data.get("source", "Unknown")
+            # Only add if this is a new source
+            if source not in sources_seen:
+                merged_data.append(data)
+                sources_seen.add(source)
+        
+        # Return the merged data list
+        return merged_data
 
 class RAGSystem:
     """Retrieval-Augmented Generation system for threat intelligence synthesis"""
     
     def __init__(self):
+        # Initialize OpenAI client as None (will be set if API key is available)
         self.openai_client = None
+        # Check if OpenAI API key is configured
         if app.config['OPENAI_API_KEY']:
+            # Set the API key for OpenAI
             openai.api_key = app.config['OPENAI_API_KEY']
+            # Store the OpenAI client for making API calls
             self.openai_client = openai
     
     def synthesize_threat_intelligence(self, indicator: ThreatIndicator, 
                                      raw_data: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Synthesize threat intelligence using RAG approach"""
         
-        # Extract relevant information from raw data
+        # Extract relevant information from raw API data and structure it
         threat_context = self._extract_threat_context(raw_data)
         
-        # Generate summary using OpenAI if available, otherwise use rule-based approach
+        # Choose between AI-powered or rule-based analysis based on OpenAI availability
         if self.openai_client:
+            # Use OpenAI GPT for intelligent threat analysis and synthesis
             return self._generate_ai_summary(indicator, threat_context)
         else:
+            # Fall back to rule-based analysis if OpenAI is not available
             return self._generate_rule_based_summary(indicator, threat_context)
     
     def _extract_threat_context(self, raw_data: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Extract relevant threat context from raw API data"""
+        # Initialize context dictionary to store structured threat information
         context = {
-            "malicious_indicators": [],
-            "threat_types": set(),
-            "confidence_scores": [],
-            "source_reports": [],
-            "geographic_info": [],
-            "temporal_info": []
+            "malicious_indicators": [],  # List of sources reporting malicious activity
+            "threat_types": set(),  # Set of threat categories (malware, botnet, etc.)
+            "confidence_scores": [],  # List of confidence scores from different sources
+            "source_reports": [],  # List of source report URLs
+            "geographic_info": [],  # List of country information
+            "temporal_info": []  # List of temporal information (first/last seen)
         }
         
+        # Process each piece of raw data from threat intelligence APIs
         for data in raw_data:
+            # Skip data entries that contain errors
             if "error" in data:
                 continue
                 
-            # Skip data with notes about missing API keys
+            # Skip data with notes about missing API keys (not useful for analysis)
             if "note" in data and "API key not configured" in data["note"]:
                 continue
                 
+            # Get the source name (e.g., "AlienVault OTX", "AbuseIPDB")
             source = data.get("source", "Unknown")
             
+            # Check if this source reports the indicator as malicious
             if data.get("malicious", False):
                 context["malicious_indicators"].append(source)
                 
+            # Extract confidence scores from pulse counts (AlienVault data)
             if "pulse_count" in data and data["pulse_count"] > 0:
+                # Convert pulse count to confidence score (max 100)
                 context["confidence_scores"].append(min(data["pulse_count"] * 10, 100))
                 
+            # Extract confidence scores from abuse confidence (AbuseIPDB data)
             if "confidence" in data:
                 context["confidence_scores"].append(data["confidence"])
                 
+            # Extract threat types from pulse tags (AlienVault data)
             if "pulses" in data:
                 for pulse in data["pulses"]:
                     if "tags" in pulse:
+                        # Add threat tags to the set (automatically handles duplicates)
                         context["threat_types"].update(pulse["tags"])
                         
+            # Extract geographic information (country codes)
             if "country" in data:
                 context["geographic_info"].append(data["country"])
                 
+            # Extract source report URLs for reference
             if "url" in data:
                 context["source_reports"].append({
-                    "source": source,
-                    "url": data["url"]
+                    "source": source,  # Source name
+                    "url": data["url"]  # URL to detailed report
                 })
         
+        # Convert threat_types set to list for JSON serialization
         context["threat_types"] = list(context["threat_types"])
+        # Return the structured threat context
         return context
     
     def _generate_ai_summary(self, indicator: ThreatIndicator, 
@@ -451,46 +618,70 @@ class ThreatAnalysisEngine:
     """Main threat analysis engine that orchestrates all components"""
     
     def __init__(self):
+        # Initialize the API handler for threat intelligence sources
         self.api = ThreatIntelligenceAPI()
+        # Initialize the RAG system for AI-powered analysis
         self.rag = RAGSystem()
+        # Initialize the machine learning risk assessment model
         self.risk_model = RiskAssessmentModel()
+        # Initialize the file storage system for saving threat data
+        self.storage = ThreatDataStorage()
     
     def analyze_indicator(self, indicator_value: str) -> ThreatReport:
         """Analyze a threat indicator and return comprehensive report"""
         
-        # Validate and determine indicator type
+        # Validate the input and determine if it's an IP, domain, or hash
         indicator = self._validate_indicator(indicator_value)
         if not indicator:
+            # Raise error if the input is not a valid threat indicator
             raise ValueError(f"Invalid indicator: {indicator_value}")
         
-        # Gather raw data from APIs
+        # Try to load any existing data for this indicator from our local files
+        existing_data = self.storage.load_threat_data(indicator)
+        
+        # Gather fresh data from threat intelligence APIs (AlienVault, AbuseIPDB)
         raw_data = self._gather_threat_data(indicator)
         
-        # Extract threat context
+        # If we have historical data, merge it with the new data
+        if existing_data:
+            # Get the historical raw data from the file
+            historical_data = existing_data.get("raw_data", [])
+            # Merge historical and new data, avoiding duplicates
+            raw_data = self.storage._merge_threat_data(historical_data, raw_data)
+            # Log that we found and merged existing data
+            logger.info(f"Found existing data for {indicator.value}, merged with new data")
+        
+        # Extract threat context from the combined data
         threat_context = self.rag._extract_threat_context(raw_data)
         
-        # Assess risk - prefer rule-based using live API data; fallback to ML if no signal
+        # Assess risk level using rule-based approach first
         risk_level, risk_score = self._assess_risk_rule_based(raw_data, threat_context)
+        # If rule-based assessment fails, use machine learning model
         if risk_level is None:
             risk_level, risk_score = self.risk_model.assess_risk(threat_context)
         
-        # Synthesize intelligence
+        # Use AI to synthesize the threat intelligence into a summary
         synthesis = self.rag.synthesize_threat_intelligence(indicator, raw_data)
         
-        # Create comprehensive report
+        # Create a comprehensive threat report with all the information
         report = ThreatReport(
-            indicator=indicator,
-            risk_level=risk_level,
-            risk_score=risk_score,
-            threat_types=threat_context.get("threat_types", ["Unknown"]),
-            summary=synthesis["summary"],
-            detailed_analysis=synthesis["detailed_analysis"],
-            recommendations=synthesis["recommendations"],
-            source_links=threat_context.get("source_reports", []),
-            analysis_timestamp=datetime.now().isoformat(),
+            indicator=indicator,  # The threat indicator being analyzed
+            risk_level=risk_level,  # High, Medium, or Low risk
+            risk_score=risk_score,  # Numerical risk score
+            threat_types=threat_context.get("threat_types", ["Unknown"]),  # Types of threats detected
+            summary=synthesis["summary"],  # AI-generated summary
+            detailed_analysis=synthesis["detailed_analysis"],  # Detailed AI analysis
+            recommendations=synthesis["recommendations"],  # AI-generated recommendations
+            source_links=threat_context.get("source_reports", []),  # Links to source reports
+            analysis_timestamp=datetime.now().isoformat(),  # When this analysis was performed
+            # Calculate average confidence from all sources
             confidence=sum(threat_context.get("confidence_scores", [0])) / len(threat_context.get("confidence_scores", [0])) if threat_context.get("confidence_scores") else 0
         )
         
+        # Save all the data to a local file for future reference
+        self.storage.save_threat_data(indicator, raw_data, report)
+        
+        # Return the complete threat report
         return report
 
     def _assess_risk_rule_based(self, raw_data: List[Dict[str, Any]], threat_context: Dict[str, Any]) -> tuple:

@@ -1,0 +1,93 @@
+{
+  "indicator": {
+    "value": "8.8.8.8",
+    "indicator_type": "ip",
+    "confidence": 0.0,
+    "first_seen": null,
+    "last_seen": null,
+    "sources": []
+  },
+  "last_updated": "2025-10-14T00:00:57.555976",
+  "analysis_count": 1,
+  "raw_data": [
+    {
+      "source": "AlienVault OTX",
+      "malicious": false,
+      "pulse_count": 0,
+      "pulses": [],
+      "url": "https://otx.alienvault.com/indicator/ip/8.8.8.8"
+    },
+    {
+      "source": "AbuseIPDB",
+      "malicious": false,
+      "confidence": 0,
+      "usage_type": "Content Delivery Network",
+      "country": "US",
+      "isp": "Google LLC",
+      "reports": 139,
+      "url": "https://www.abuseipdb.com/check/8.8.8.8"
+    }
+  ],
+  "latest_analysis": {
+    "indicator": {
+      "value": "8.8.8.8",
+      "indicator_type": "ip",
+      "confidence": 0.0,
+      "first_seen": null,
+      "last_seen": null,
+      "sources": []
+    },
+    "risk_level": "Low",
+    "risk_score": 0.15,
+    "threat_types": [],
+    "summary": "1. Risk level: Low\n2. Threat types involved: None identified\n3. Plain-language summary: The threat intelligence data for IP 8.8.8.8 does not indicate any malicious indicators or threat types. The confidence score is 0, suggesting a low risk level.\n4. Detailed analysis: The IP address 8.8.8.8 is associated with Google's public DNS service. It is commonly used for legitimate purposes such as resolving domain names to IP addresses. The geographic information indicates that the IP is located in the US, which is a common location for Google's servers.\n5. Recommendations: Based on the threat intelligence data provided, there is no immediate threat associated with IP 8.8.8.8. It is safe to continue using this IP address for DNS resolution and other legitimate purposes. Regular monitoring of threat intelligence sources is recommended to stay informed about any potential changes in risk level.",
+    "detailed_analysis": "1. Risk level: Low\n2. Threat types involved: None identified\n3. Plain-language summary: The threat intelligence data for IP 8.8.8.8 does not indicate any malicious indicators or threat types. The confidence score is 0, suggesting a low risk level.\n4. Detailed analysis: The IP address 8.8.8.8 is associated with Google's public DNS service. It is commonly used for legitimate purposes such as resolving domain names to IP addresses. The geographic information indicates that the IP is located in the US, which is a common location for Google's servers.\n5. Recommendations: Based on the threat intelligence data provided, there is no immediate threat associated with IP 8.8.8.8. It is safe to continue using this IP address for DNS resolution and other legitimate purposes. Regular monitoring of threat intelligence sources is recommended to stay informed about any potential changes in risk level.",
+    "recommendations": [
+      "Monitor for suspicious activity"
+    ],
+    "source_links": [
+      {
+        "source": "AlienVault OTX",
+        "url": "https://otx.alienvault.com/indicator/ip/8.8.8.8"
+      },
+      {
+        "source": "AbuseIPDB",
+        "url": "https://www.abuseipdb.com/check/8.8.8.8"
+      }
+    ],
+    "analysis_timestamp": "2025-10-14T00:00:57.555667",
+    "confidence": 0.0
+  },
+  "historical_analyses": [
+    {
+      "indicator": {
+        "value": "8.8.8.8",
+        "indicator_type": "ip",
+        "confidence": 0.0,
+        "first_seen": null,
+        "last_seen": null,
+        "sources": []
+      },
+      "risk_level": "Low",
+      "risk_score": 0.15,
+      "threat_types": [],
+      "summary": "1. Risk level: Low\n2. Threat types involved: None identified\n3. Plain-language summary: The threat intelligence data for IP 8.8.8.8 does not indicate any malicious indicators or threat types. The confidence score is 0, suggesting a low risk level.\n4. Detailed analysis: The IP address 8.8.8.8 is associated with Google's public DNS service. It is commonly used for legitimate purposes such as resolving domain names to IP addresses. The geographic information indicates that the IP is located in the US, which is a common location for Google's servers.\n5. Recommendations: Based on the threat intelligence data provided, there is no immediate threat associated with IP 8.8.8.8. It is safe to continue using this IP address for DNS resolution and other legitimate purposes. Regular monitoring of threat intelligence sources is recommended to stay informed about any potential changes in risk level.",
+      "detailed_analysis": "1. Risk level: Low\n2. Threat types involved: None identified\n3. Plain-language summary: The threat intelligence data for IP 8.8.8.8 does not indicate any malicious indicators or threat types. The confidence score is 0, suggesting a low risk level.\n4. Detailed analysis: The IP address 8.8.8.8 is associated with Google's public DNS service. It is commonly used for legitimate purposes such as resolving domain names to IP addresses. The geographic information indicates that the IP is located in the US, which is a common location for Google's servers.\n5. Recommendations: Based on the threat intelligence data provided, there is no immediate threat associated with IP 8.8.8.8. It is safe to continue using this IP address for DNS resolution and other legitimate purposes. Regular monitoring of threat intelligence sources is recommended to stay informed about any potential changes in risk level.",
+      "recommendations": [
+        "Monitor for suspicious activity"
+      ],
+      "source_links": [
+        {
+          "source": "AlienVault OTX",
+          "url": "https://otx.alienvault.com/indicator/ip/8.8.8.8"
+        },
+        {
+          "source": "AbuseIPDB",
+          "url": "https://www.abuseipdb.com/check/8.8.8.8"
+        }
+      ],
+      "analysis_timestamp": "2025-10-14T00:00:57.555667",
+      "confidence": 0.0
+    }
+  ]
+}
