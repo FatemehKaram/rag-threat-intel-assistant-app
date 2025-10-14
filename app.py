@@ -227,66 +227,67 @@ class ThreatIntelligenceAPI:
             return {"error": str(e)}
 
 class ThreatDataStorage:
-    """Handles local storage of threat intelligence data"""
+    """Handles local storage of threat intelligence data in a single file"""
     
     def __init__(self, storage_dir="threat_data"):
-        # Set the directory where threat data files will be stored
+        # Set the directory where threat data file will be stored
         self.storage_dir = storage_dir
         # Create the directory if it doesn't exist (exist_ok=True prevents error if already exists)
         os.makedirs(storage_dir, exist_ok=True)
+        # Set the single file path for all threat data
+        self.data_file = os.path.join(storage_dir, "latest_threat_analysis.json")
     
     def save_threat_data(self, indicator: ThreatIndicator, raw_data: List[Dict[str, Any]], analysis: ThreatReport):
-        """Save threat data to file"""
-        # Create filename by combining indicator type and value, replacing special characters
-        # Example: "ip_8.8.8.8.json" or "domain_example.com.json"
-        filename = f"{indicator.indicator_type}_{indicator.value.replace('/', '_').replace(':', '_')}.json"
-        # Create full file path by joining directory and filename
-        filepath = os.path.join(self.storage_dir, filename)
-        
-        # Try to load existing data for this indicator, or return None if no file exists
-        existing_data = self.load_threat_data(indicator) or {}
-        
-        # Update the existing data dictionary with new information
-        existing_data.update({
+        """Save threat data to single file, replacing previous data"""
+        # Create new data structure for this analysis
+        new_data = {
             # Store the indicator information (IP, domain, or hash details)
             "indicator": asdict(indicator),
             # Record when this data was last updated (current timestamp)
             "last_updated": datetime.now().isoformat(),
-            # Increment the counter of how many times this indicator has been analyzed
-            "analysis_count": existing_data.get("analysis_count", 0) + 1,
             # Store the raw data from threat intelligence APIs
             "raw_data": raw_data,
             # Store the latest analysis results
             "latest_analysis": asdict(analysis),
-            # Keep a history of analyses (last 10), adding the new one to the end
-            "historical_analyses": existing_data.get("historical_analyses", [])[-9:] + [asdict(analysis)]
-        })
+            # Store analysis metadata
+            "analysis_metadata": {
+                "indicator_type": indicator.indicator_type,
+                "indicator_value": indicator.value,
+                "analysis_timestamp": analysis.analysis_timestamp,
+                "risk_level": analysis.risk_level,
+                "risk_score": analysis.risk_score,
+                "confidence": analysis.confidence
+            }
+        }
         
-        # Write the updated data to the JSON file
-        with open(filepath, 'w') as f:
+        # Write the new data to the single JSON file (overwrites previous data)
+        with open(self.data_file, 'w') as f:
             # Convert Python dictionary to JSON format with 2-space indentation for readability
-            json.dump(existing_data, f, indent=2)
+            json.dump(new_data, f, indent=2)
         
         # Log that the data was successfully saved
-        logger.info(f"Saved threat data for {indicator.value} to {filepath}")
+        logger.info(f"Saved threat data for {indicator.value} to {self.data_file}")
     
     def load_threat_data(self, indicator: ThreatIndicator) -> Optional[Dict[str, Any]]:
-        """Load existing threat data"""
-        # Create the same filename format as in save_threat_data
-        filename = f"{indicator.indicator_type}_{indicator.value.replace('/', '_').replace(':', '_')}.json"
-        # Create full file path
-        filepath = os.path.join(self.storage_dir, filename)
-        
-        # Check if the file exists
-        if os.path.exists(filepath):
+        """Load existing threat data from single file"""
+        # Check if the single data file exists
+        if os.path.exists(self.data_file):
             try:
                 # Open the file for reading
-                with open(filepath, 'r') as f:
+                with open(self.data_file, 'r') as f:
                     # Convert JSON data back to Python dictionary
-                    return json.load(f)
+                    data = json.load(f)
+                    # Check if this data is for the same indicator
+                    if (data.get("indicator", {}).get("value") == indicator.value and 
+                        data.get("indicator", {}).get("indicator_type") == indicator.indicator_type):
+                        return data
+                    else:
+                        # Data is for a different indicator, return None
+                        logger.info(f"Data file contains different indicator, treating as new analysis")
+                        return None
             except Exception as e:
                 # If there's an error reading the file, log it and return None
-                logger.error(f"Error loading threat data from {filepath}: {str(e)}")
+                logger.error(f"Error loading threat data from {self.data_file}: {str(e)}")
         # Return None if file doesn't exist or there was an error
         return None
     
@@ -317,6 +318,27 @@ class ThreatDataStorage:
         
         # Return the merged data list
         return merged_data
+    
+    def clear_data(self):
+        """Clear all threat data (delete the single file)"""
+        if os.path.exists(self.data_file):
+            os.remove(self.data_file)
+            logger.info(f"Cleared threat data file: {self.data_file}")
+    
+    def get_latest_analysis_info(self) -> Optional[Dict[str, Any]]:
+        """Get information about the latest analysis without loading full data"""
+        if os.path.exists(self.data_file):
+            try:
+                with open(self.data_file, 'r') as f:
+                    data = json.load(f)
+                    return {
+                        "indicator": data.get("indicator", {}),
+                        "last_updated": data.get("last_updated"),
+                        "analysis_metadata": data.get("analysis_metadata", {})
+                    }
+            except Exception as e:
+                logger.error(f"Error reading latest analysis info: {str(e)}")
+        return None
 
 class RAGSystem:
     """Retrieval-Augmented Generation system for threat intelligence synthesis"""
