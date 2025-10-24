@@ -1127,6 +1127,29 @@ def debug_test_llm():
             'error_type': type(e).__name__
         })
 
+@app.route('/stored-data')
+def get_stored_data():
+    """Get stored threat analysis data"""
+    try:
+        # Initialize storage to get the data
+        storage = ThreatDataStorage()
+        data_file = storage.data_file
+        
+        if not os.path.exists(data_file):
+            return jsonify({'error': 'No stored analysis data found'})
+        
+        with open(data_file, 'r') as f:
+            data = json.load(f)
+        
+        return jsonify({
+            'success': True,
+            'data': data
+        })
+        
+    except Exception as e:
+        logger.error(f"Error loading stored data: {str(e)}")
+        return jsonify({'error': 'Failed to load stored data'}), 500
+
 if __name__ == '__main__':
     # Create necessary directories
     os.makedirs('templates', exist_ok=True)

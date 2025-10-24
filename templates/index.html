@@ -675,6 +675,155 @@
             transform: scale(1.05);
         }
 
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(5px);
+        }
+
+        .modal-content {
+            background: rgba(255, 255, 255, 0.98);
+            backdrop-filter: blur(20px);
+            margin: 2% auto;
+            padding: 0;
+            border-radius: 24px;
+            width: 90%;
+            max-width: 1000px;
+            max-height: 90vh;
+            overflow: hidden;
+            box-shadow: 
+                0 25px 50px rgba(0,0,0,0.25),
+                0 0 0 1px rgba(255, 255, 255, 0.2);
+            animation: modalSlideIn 0.3s ease-out;
+        }
+
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-50px) scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .modal-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+            color: white;
+            padding: 24px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 50%;
+            transition: all 0.3s ease;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-close:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: scale(1.1);
+        }
+
+        .modal-body {
+            padding: 30px;
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+
+        .data-section {
+            margin-bottom: 25px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            border-left: 4px solid #667eea;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .data-section h3 {
+            margin-bottom: 15px;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .data-section p {
+            line-height: 1.6;
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        .data-section pre {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-size: 12px;
+            border: 1px solid #e9ecef;
+        }
+
+        .json-viewer {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
+        .json-key {
+            color: #d73a49;
+            font-weight: bold;
+        }
+
+        .json-string {
+            color: #032f62;
+        }
+
+        .json-number {
+            color: #005cc5;
+        }
+
+        .json-boolean {
+            color: #e36209;
+        }
+
+        .json-null {
+            color: #6f42c1;
+        }
+
         @media (max-width: 768px) {
             .chatbot-panel {
                 width: 100%;
@@ -704,6 +853,15 @@
             
             .container {
                 padding: 10px;
+            }
+
+            .modal-content {
+                width: 95%;
+                margin: 5% auto;
+            }
+
+            .modal-body {
+                padding: 20px;
             }
         }
     </style>
@@ -771,10 +929,16 @@
                     </div>
                 </div>
                 
-                <button class="analyze-btn" onclick="analyzeIndicator()">
-                    <i class="fas fa-search"></i>
-                    Analyze Threat
-                </button>
+                <div style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
+                    <button class="analyze-btn" onclick="analyzeIndicator()">
+                        <i class="fas fa-search"></i>
+                        Analyze Threat
+                    </button>
+                    <button class="analyze-btn" onclick="showStoredData()" style="background: linear-gradient(135deg, #10b981 0%, #059669 50%, #047857 100%);">
+                        <i class="fas fa-database"></i>
+                        View Stored Data
+                    </button>
+                </div>
             </div>
 
             <div class="loading" id="loading">
@@ -800,6 +964,19 @@
                 <div class="footer">
                     <p>Powered by AlienVault OTX, AbuseIPDB, and AI-driven analysis</p>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stored Data Modal -->
+    <div id="storedDataModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-database"></i> Stored Threat Analysis Data</h2>
+                <button class="modal-close" onclick="closeStoredDataModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="modalBody">
+                <!-- Data will be loaded here -->
             </div>
         </div>
     </div>
@@ -1055,6 +1232,138 @@
                 analyzeIndicator();
             }
         });
+
+        // Stored Data Modal Functions
+        function showStoredData() {
+            const modal = document.getElementById('storedDataModal');
+            const modalBody = document.getElementById('modalBody');
+            
+            // Show loading state
+            modalBody.innerHTML = `
+                <div style="text-align: center; padding: 40px;">
+                    <div class="spinner"></div>
+                    <p>Loading stored data...</p>
+                </div>
+            `;
+            
+            modal.style.display = 'block';
+            
+            // Fetch stored data
+            fetch('/stored-data')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        displayStoredData(data.data);
+                    } else {
+                        modalBody.innerHTML = `
+                            <div style="text-align: center; padding: 40px; color: #dc2626;">
+                                <i class="fas fa-exclamation-triangle" style="font-size: 48px; margin-bottom: 20px;"></i>
+                                <h3>No Stored Data Found</h3>
+                                <p>${data.error || 'No threat analysis data has been stored yet.'}</p>
+                                <p>Try analyzing a threat indicator first!</p>
+                            </div>
+                        `;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading stored data:', error);
+                    modalBody.innerHTML = `
+                        <div style="text-align: center; padding: 40px; color: #dc2626;">
+                            <i class="fas fa-exclamation-triangle" style="font-size: 48px; margin-bottom: 20px;"></i>
+                            <h3>Error Loading Data</h3>
+                            <p>Failed to load stored data. Please try again.</p>
+                        </div>
+                    `;
+                });
+        }
+
+        function closeStoredDataModal() {
+            document.getElementById('storedDataModal').style.display = 'none';
+        }
+
+        function displayStoredData(data) {
+            const modalBody = document.getElementById('modalBody');
+            
+            // Format the data for display
+            const indicator = data.indicator || {};
+            const analysis = data.latest_analysis || {};
+            const rawData = data.raw_data || [];
+            const metadata = data.analysis_metadata || {};
+            
+            modalBody.innerHTML = `
+                <div class="data-section">
+                    <h3><i class="fas fa-info-circle"></i> Indicator Information</h3>
+                    <p><strong>Type:</strong> ${indicator.indicator_type?.toUpperCase() || 'Unknown'}</p>
+                    <p><strong>Value:</strong> ${indicator.value || 'N/A'}</p>
+                    <p><strong>Last Updated:</strong> ${new Date(data.last_updated).toLocaleString()}</p>
+                    <p><strong>Confidence:</strong> ${(indicator.confidence || 0).toFixed(2)}</p>
+                </div>
+
+                <div class="data-section">
+                    <h3><i class="fas fa-chart-line"></i> Analysis Results</h3>
+                    <p><strong>Risk Level:</strong> <span class="risk-badge ${getRiskClass(analysis.risk_level)}">${analysis.risk_level || 'Unknown'}</span></p>
+                    <p><strong>Risk Score:</strong> ${((analysis.risk_score || 0) * 100).toFixed(1)}%</p>
+                    <p><strong>Confidence:</strong> ${((analysis.confidence || 0) * 100).toFixed(1)}%</p>
+                    <p><strong>Analysis Time:</strong> ${new Date(analysis.analysis_timestamp).toLocaleString()}</p>
+                </div>
+
+                <div class="data-section">
+                    <h3><i class="fas fa-bug"></i> Threat Types</h3>
+                    <div class="threat-types">
+                        ${formatThreatTypes(analysis.threat_types)}
+                    </div>
+                </div>
+
+                <div class="data-section">
+                    <h3><i class="fas fa-file-alt"></i> Summary</h3>
+                    <p>${analysis.summary || 'No summary available'}</p>
+                </div>
+
+                <div class="data-section">
+                    <h3><i class="fas fa-tasks"></i> Recommendations</h3>
+                    <ul class="recommendations">
+                        ${formatRecommendations(analysis.recommendations)}
+                    </ul>
+                </div>
+
+                <div class="data-section">
+                    <h3><i class="fas fa-database"></i> Raw Intelligence Data</h3>
+                    <p>Data from ${rawData.length} threat intelligence sources:</p>
+                    ${rawData.map(source => `
+                        <div style="margin: 10px 0; padding: 10px; background: #f8f9fa; border-radius: 8px;">
+                            <strong>${source.source || 'Unknown Source'}</strong>
+                            ${source.malicious ? '<span style="color: #dc2626; margin-left: 10px;">⚠️ Malicious</span>' : '<span style="color: #059669; margin-left: 10px;">✅ Clean</span>'}
+                            ${source.confidence ? `<br>Confidence: ${source.confidence}%` : ''}
+                            ${source.pulse_count ? `<br>Pulse Count: ${source.pulse_count}` : ''}
+                        </div>
+                    `).join('')}
+                </div>
+
+                <div class="data-section">
+                    <h3><i class="fas fa-code"></i> Complete JSON Data</h3>
+                    <div class="json-viewer" id="jsonViewer">
+                        ${formatJSON(data)}
+                    </div>
+                </div>
+            `;
+        }
+
+        function formatJSON(obj) {
+            return JSON.stringify(obj, null, 2)
+                .replace(/(".*?"):/g, '<span class="json-key">$1</span>:')
+                .replace(/(".*?")/g, '<span class="json-string">$1</span>')
+                .replace(/\b(\d+\.?\d*)\b/g, '<span class="json-number">$1</span>')
+                .replace(/\b(true|false)\b/g, '<span class="json-boolean">$1</span>')
+                .replace(/\bnull\b/g, '<span class="json-null">null</span>');
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('storedDataModal');
+            if (event.target === modal) {
+                closeStoredDataModal();
+            }
+        }
     </script>
 </body>
 </html>
