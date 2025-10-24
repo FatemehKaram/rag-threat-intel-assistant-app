@@ -11,6 +11,8 @@ A modern, AI-powered threat analysis platform that instantly evaluates IP addres
 - **🌐 Web Interface**: Beautiful, responsive design at `http://localhost:5000`
 - **🔗 API Access**: RESTful endpoints for integration
 - **🧠 RAG System**: Retrieval-Augmented Generation for intelligent summaries
+- **💾 Data Storage**: Automatic storage of threat analysis results
+- **📋 JSON Viewer**: Beautiful modal to view stored analysis data with syntax highlighting
 
 ## 📋 Prerequisites
 
@@ -182,7 +184,9 @@ Before setting up the application, ensure you have:
 
 Once running, access the application at:
 - **Web Interface**: `http://localhost:5000`
-- **API Endpoint**: `POST http://localhost:5000/analyze`
+- **Analysis API**: `POST http://localhost:5000/analyze`
+- **Chat API**: `POST http://localhost:5000/chat`
+- **Stored Data API**: `GET http://localhost:5000/stored-data`
 - **Health Check**: `GET http://localhost:5000/health`
 
 ## 🎯 How It Works
@@ -192,7 +196,15 @@ Once running, access the application at:
 2. **Intelligence Gathering**: Queries multiple threat intelligence sources
 3. **AI Processing**: Uses RAG system for intelligent analysis
 4. **Risk Assessment**: Generates risk score and recommendations
-5. **Interactive Chat**: Ask questions about results via AI chatbot
+5. **Data Storage**: Automatically saves analysis results to JSON file
+6. **Interactive Chat**: Ask questions about results via AI chatbot
+
+### Data Storage & Viewing
+- **Automatic Storage**: Every analysis is saved to `threat_data/latest_threat_analysis.json`
+- **JSON Viewer**: Click "View Stored Data" to see complete analysis data
+- **Syntax Highlighting**: Beautiful dark theme with color-coded JSON
+- **Scrollable Interface**: Handle large datasets with ease
+- **Modal Display**: Clean, focused view of stored threat intelligence data
 
 ### Risk Scoring
 - **🔴 High Risk**: AbuseIPDB confidence ≥ 70% OR OTX pulse count ≥ 5
@@ -231,6 +243,7 @@ Once running, access the application at:
 2. Enter threat indicator in the input field
 3. Click "Analyze Threat" or press Enter
 4. Review results and chat with AI assistant
+5. Click "View Stored Data" to see complete JSON analysis data
 
 ### API Usage
 ```bash
@@ -244,6 +257,11 @@ curl -X POST http://localhost:5000/analyze \
 curl -X POST http://localhost:5000/chat \
   -H "Content-Type: application/json" \
   -d '{"message": "What is the risk level?"}'
+```
+
+### Stored Data API
+```bash
+curl -X GET http://localhost:5000/stored-data
 ```
 
 ## 🛠️ Development
@@ -277,6 +295,7 @@ rag-threat-intel-assistant-app/
 ├── models/             # ML models and vectorizers
 ├── logs/               # Application logs
 ├── threat_data/        # Threat intelligence data storage
+│   └── latest_threat_analysis.json  # Stored analysis results
 └── rag/                # RAG system components
 ```
 
@@ -387,6 +406,14 @@ docker system prune -a
 # Rebuild without cache
 docker build --no-cache -t threat-intel-assistant .
 ```
+
+#### 6. Stored Data Issues
+**Problem**: "No stored analysis data found" message
+**Solution**:
+- Ensure you've run at least one threat analysis first
+- Check that `threat_data/latest_threat_analysis.json` exists
+- Verify file permissions allow reading the JSON file
+- Try analyzing a new indicator to generate fresh data
 
 ### Debug Mode
 
