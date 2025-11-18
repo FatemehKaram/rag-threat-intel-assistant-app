@@ -698,6 +698,7 @@ class ThreatAnalysisEngine:
             analysis_timestamp=datetime.now().isoformat(),  # When this analysis was performed
             # Calculate average confidence from all sources
             confidence=sum(threat_context.get("confidence_scores", [0])) / len(threat_context.get("confidence_scores", [0])) if threat_context.get("confidence_scores") else 0
+            
         )
         
         # Save all the data to a local file for future reference
@@ -944,7 +945,7 @@ def generate_llm_chat_response(message: str, analysis_results: Optional[Dict[str
         - Summary: {summary}
         - Detailed Analysis: {detailed_analysis}
         - Recommendations: {'; '.join(recommendations) if recommendations else 'None provided'}
-        - Confidence: {confidence:.2f} ({int(confidence * 100)}%)
+        # - Confidence: {confidence:.2f} ({int(confidence * 100)}%)
         - Sources: {len(source_links)} threat intelligence sources consulted
         
         User Question: "{message}"
