@@ -14,6 +14,72 @@ A modern, AI-powered threat analysis platform that instantly evaluates IP addres
 - **💾 Data Storage**: Automatic storage of threat analysis results
 - **📋 JSON Viewer**: Beautiful modal to view stored analysis data with syntax highlighting
 
+## 🛠️ Tech Stack
+
+**Backend:**
+- Python 3.9+
+- Flask (Web Framework)
+- OpenAI API (GPT-3.5-turbo for AI features)
+- scikit-learn (Machine Learning)
+- NumPy, Joblib (ML Model Management)
+
+**Frontend:**
+- HTML5, CSS3 (Glass morphism design)
+- JavaScript (Interactive UI)
+
+**APIs & Integrations:**
+- AlienVault OTX API
+- AbuseIPDB API
+- OpenAI API
+
+**DevOps & Deployment:**
+- Docker & Docker Compose
+- Gunicorn (Production WSGI server)
+- Environment-based configuration
+
+**Data & ML:**
+- RAG (Retrieval-Augmented Generation) system
+- Random Forest Classifier for risk assessment
+- TF-IDF Vectorization
+- JSON data storage
+
+## 💼 Skills Demonstrated
+
+- **Full-Stack Development**: Flask backend with modern frontend
+- **AI/ML Integration**: RAG system, ML-based risk assessment, LLM integration
+- **API Integration**: Multiple third-party threat intelligence APIs
+- **System Design**: Modular architecture with separation of concerns
+- **DevOps**: Docker containerization, production deployment
+- **Data Processing**: Threat intelligence synthesis and analysis
+- **Security**: Secure API key management, input validation
+- **Testing**: Automated testing suite
+
+## 🏗️ Architecture Highlights
+
+- **RAG System**: Retrieval-Augmented Generation for intelligent threat synthesis
+- **ML Risk Assessment**: Machine learning model for automated risk scoring
+- **Modular Design**: Separate classes for API handling, storage, analysis, and RAG
+- **Fallback Mechanisms**: Graceful degradation when APIs are unavailable
+- **Data Persistence**: JSON-based storage for threat analysis history
+
+## 📊 How It Works
+
+```mermaid
+flowchart LR
+    A[👤 User Input<br/>IP/Domain/Hash] --> B[🔍 Query Threat APIs<br/>AlienVault & AbuseIPDB]
+    B --> C[🧠 AI Analysis<br/>RAG System + ML Model]
+    C --> D[📊 Risk Assessment<br/>High/Medium/Low]
+    D --> E[💬 Interactive Chat<br/>Ask Questions]
+    D --> F[💾 Save Results<br/>JSON Storage]
+    
+    style A fill:#e3f2fd
+    style B fill:#fff3e0
+    style C fill:#f3e5f5
+    style D fill:#e8f5e9
+    style E fill:#fce4ec
+    style F fill:#f1f8e9
+```
+
 ## 📋 Prerequisites
 
 Before setting up the application, ensure you have:
@@ -189,7 +255,7 @@ Once running, access the application at:
 - **Stored Data API**: `GET http://localhost:5000/stored-data`
 - **Health Check**: `GET http://localhost:5000/health`
 
-## 🎯 How It Works
+## 🎯 Detailed Process
 
 ### Threat Analysis
 1. **Input**: Enter IP address, domain, or file hash
@@ -235,6 +301,19 @@ Once running, access the application at:
 - **Fallback Logic**: Works without API keys (reduced functionality)
 - **ML Integration**: Machine learning risk assessment
 - **Real-time Analysis**: Instant threat evaluation
+
+## 🧪 Testing
+
+Run the test suite:
+```bash
+python test_app.py
+```
+
+Tests cover:
+- Health check endpoint
+- Threat analysis functionality
+- Input validation
+- Error handling
 
 ## 📝 Usage Examples
 
