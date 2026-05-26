@@ -756,6 +756,13 @@ class ThreatAnalysisEngine:
                 base = max(base, 0.45 + min(total_pulse_count, 5) * 0.05)
             return "Medium", min(base, 0.7)
 
+        # # Otherwise Low
+        # return "Low", 0.15
+
+        # No useful threat intelligence data found
+        if total_pulse_count == 0 and (max_abuse_confidence is None or max_abuse_confidence == 0):
+            return "Unknown", 0.0
+
         # Otherwise Low
         return "Low", 0.15
     
@@ -780,14 +787,22 @@ class ThreatAnalysisEngine:
         
         return None
     
+    # def _is_valid_domain(self, domain: str) -> bool:
+    #     """Check if string is a valid domain"""
+    #     try:
+    #         result = urlparse(f"http://{domain}")
+    #         return all([result.scheme, result.netloc]) and '.' in domain
+    #     except:
+    #         return False
     def _is_valid_domain(self, domain: str) -> bool:
         """Check if string is a valid domain"""
-        try:
-            result = urlparse(f"http://{domain}")
-            return all([result.scheme, result.netloc]) and '.' in domain
-        except:
-            return False
-    
+
+        domain_pattern = (
+            r"^(?!-)([A-Za-z0-9-]{1,63}\.)+[A-Za-z]{2,63}$"
+        )
+
+        return bool(re.match(domain_pattern, domain))
+
     def _is_valid_hash(self, hash_value: str) -> bool:
         """Check if string is a valid hash"""
         hash_value = hash_value.lower()

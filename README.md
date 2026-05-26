@@ -315,6 +315,31 @@ Tests cover:
 - Input validation
 - Error handling
 
+## 🧪 Testing & QA Improvements
+
+The application was manually tested using different types of valid, invalid, incomplete, and edge-case inputs to improve reliability, usability, and user experience.
+
+### Testing Activities
+- Input validation testing
+- Domain and IP edge-case testing
+- Error handling verification
+- Risk classification validation
+- User-focused usability testing
+
+### Example Issues Identified and Resolved
+- Invalid IP-like values were incorrectly classified as domains
+- Unknown or unverifiable domains returned misleading LOW risk results
+- Input validation logic was improved using stricter regular-expression-based validation
+- Risk assessment logic was updated to distinguish between verified low-risk indicators and insufficient-data situations
+
+### Documentation Created
+- Test Plan
+- Test Cases
+- Bug Reports
+- Test Summary
+
+These improvements helped improve the reliability, clarity, and usability of the application.
+
 ## 📝 Usage Examples
 
 ### Web Interface
