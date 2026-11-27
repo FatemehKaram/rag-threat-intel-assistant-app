@@ -14,6 +14,46 @@ A modern, AI-powered threat analysis platform that instantly evaluates IP addres
 - **💾 Data Storage**: Automatic storage of threat analysis results
 - **📋 JSON Viewer**: Beautiful modal to view stored analysis data with syntax highlighting
 
+## ☁️ AWS EC2 Deployment & Application Demo
+
+The Threat Intelligence Assistant was deployed on an **AWS EC2 Ubuntu instance** using **Docker Compose** and **Gunicorn**. The screenshots below document the running web application, threat-analysis results, and JSON evidence. The EC2 instance is stopped when not needed to reduce compute costs, so the live URL may be unavailable or change when the instance is restarted.
+
+### Application interface
+
+![Threat Intelligence Assistant home page running on AWS EC2](docs/screenshots/00.png)
+
+*The application home page supports IP addresses, domains, and file hashes.*
+
+### Threat analysis results
+
+| IP reputation assessment | High-risk file hash |
+| --- | --- |
+| ![8.8.8.8 classified LOW with 15 percent risk score](docs/screenshots/02.png) | ![Example MD5 hash classified HIGH with 75 percent risk score](docs/screenshots/03.png) |
+| A successful lookup of `8.8.8.8` returned **LOW (15%)** after the risk-classification regression fix. | An example MD5 hash returned **HIGH (75%)** based on the threat intelligence results at the time of analysis. |
+
+### Stored analysis data
+
+![Stored JSON threat-intelligence analysis returned by the deployed application](docs/screenshots/04.png)
+
+*The stored JSON viewer exposes the structured risk assessment, analysis metadata, and source references.*
+
+<details>
+<summary>Additional screenshot: indicator entry</summary>
+
+![Threat Intelligence Assistant with IP indicator entered](docs/screenshots/01.png)
+
+</details>
+
+### Deployment verification
+
+- Built the Flask application into a Docker image and ran it on EC2 with Docker Compose and Gunicorn.
+- Confirmed the container reported **healthy** and the `/health` endpoint responded successfully.
+- Added and ran **11 regression tests** for LOW, MEDIUM, HIGH, UNKNOWN, missing API data, and malformed responses; all passed locally and on EC2.
+- Merged the risk-assessment fix into `main` via [pull request #1](https://github.com/FatemehKaram/rag-threat-intel-assistant-app/pull/1).
+- Retained the previous Docker image as a rollback option before deployment.
+
+**Deployment note:** Screenshots document testing on the EC2 instance; they are not a continuously hosted demonstration. The test endpoint used HTTP, not HTTPS. LOW and HIGH describe the results returned by the threat-intelligence feeds at the time of testing, not guarantees of safety or maliciousness.
+
 ## 🛠️ Tech Stack
 
 **Backend:**
