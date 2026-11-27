@@ -33,6 +33,7 @@ import joblib
 import numpy as np
 # Import our custom configuration module
 from config import config
+from risk_assessment import assess_feed_risk
 
 # Configure logging system to write to both file and console
 logging.basicConfig(
@@ -110,6 +111,11 @@ class ThreatIntelligenceAPI:
             
             # Parse JSON response from the API
             data = response.json()
+            pulse_info = data.get('pulse_info')
+            if (not isinstance(pulse_info, dict)
+                    or type(pulse_info.get('count')) is not int
+                    or pulse_info['count'] < 0):
+                return {"error": "Invalid AlienVault response: missing valid pulse count"}
             # Return structured data about the IP address
             return {
                 "source": "AlienVault OTX",  # Source identifier
@@ -145,6 +151,9 @@ class ThreatIntelligenceAPI:
             data = response.json()
             # Extract the data section from the response
             result = data.get('data', {})
+            confidence = result.get('abuseConfidencePercentage') if isinstance(result, dict) else None
+            if type(confidence) is not int or not 0 <= confidence <= 100:
+                return {"error": "Invalid AbuseIPDB response: missing valid confidence"}
             
             # Return structured data about the IP address
             return {
@@ -181,6 +190,11 @@ class ThreatIntelligenceAPI:
             
             # Parse JSON response from the API
             data = response.json()
+            pulse_info = data.get('pulse_info')
+            if (not isinstance(pulse_info, dict)
+                    or type(pulse_info.get('count')) is not int
+                    or pulse_info['count'] < 0):
+                return {"error": "Invalid AlienVault response: missing valid pulse count"}
             # Return structured data about the domain
             return {
                 "source": "AlienVault OTX",  # Source identifier
@@ -213,6 +227,11 @@ class ThreatIntelligenceAPI:
             
             # Parse JSON response from the API
             data = response.json()
+            pulse_info = data.get('pulse_info')
+            if (not isinstance(pulse_info, dict)
+                    or type(pulse_info.get('count')) is not int
+                    or pulse_info['count'] < 0):
+                return {"error": "Invalid AlienVault response: missing valid pulse count"}
             # Return structured data about the file hash
             return {
                 "source": "AlienVault OTX",  # Source identifier
@@ -663,6 +682,8 @@ class ThreatAnalysisEngine:
         
         # Gather fresh data from threat intelligence APIs (AlienVault, AbuseIPDB)
         raw_data = self._gather_threat_data(indicator)
+        # Use fresh feed responses for the current risk assessment.
+        fresh_raw_data = raw_data
         
         # If we have historical data, merge it with the new data
         if existing_data:
@@ -677,7 +698,7 @@ class ThreatAnalysisEngine:
         threat_context = self.rag._extract_threat_context(raw_data)
         
         # Assess risk level using rule-based approach first
-        risk_level, risk_score = self._assess_risk_rule_based(raw_data, threat_context)
+        risk_level, risk_score = self._assess_risk_rule_based(fresh_raw_data, threat_context, indicator.indicator_type)
         # If rule-based assessment fails, use machine learning model
         if risk_level is None:
             risk_level, risk_score = self.risk_model.assess_risk(threat_context)
@@ -707,65 +728,12 @@ class ThreatAnalysisEngine:
         # Return the complete threat report
         return report
 
-    def _assess_risk_rule_based(self, raw_data: List[Dict[str, Any]], threat_context: Dict[str, Any]) -> tuple:
-        """Assess risk using clear, deterministic thresholds from feed responses.
+    def _assess_risk_rule_based(self, raw_data: List[Dict[str, Any]],
+                                threat_context: Dict[str, Any],
+                                indicator_type: str = "ip") -> tuple:
+        """Assess fresh responses without conflating zero scores with missing data."""
+        return assess_feed_risk(raw_data, indicator_type)
 
-        Returns (risk_level, risk_score) or (None, None) if there is no usable signal.
-        """
-        if not raw_data:
-            return None, None
-
-        max_abuse_confidence = None
-        total_pulse_count = 0
-        any_feed_present = False
-
-        for entry in raw_data:
-            if not isinstance(entry, dict):
-                continue
-            if "error" in entry:
-                continue
-
-            source = entry.get("source")
-            if source:
-                any_feed_present = True
-
-            # AbuseIPDB confidence
-            if source == "AbuseIPDB" and isinstance(entry.get("confidence"), (int, float)):
-                conf = float(entry.get("confidence", 0))
-                max_abuse_confidence = conf if max_abuse_confidence is None else max(max_abuse_confidence, conf)
-
-            # OTX pulse count
-            if source == "AlienVault OTX" and isinstance(entry.get("pulse_count"), (int, float)):
-                total_pulse_count += int(entry.get("pulse_count", 0))
-
-        if not any_feed_present:
-            return None, None
-
-        # Determine risk level from thresholds
-        # High if strong signal from either feed
-        if (max_abuse_confidence is not None and max_abuse_confidence >= 70) or (total_pulse_count >= 5):
-            return "High", 0.9 if max_abuse_confidence and max_abuse_confidence >= 90 else 0.75
-
-        # Medium for moderate signals
-        if (max_abuse_confidence is not None and max_abuse_confidence >= 30) or (total_pulse_count >= 1):
-            # scale score between 0.4 and 0.7
-            base = 0.5
-            if max_abuse_confidence is not None:
-                base = max(base, 0.3 + (max_abuse_confidence/100) * 0.4)
-            if total_pulse_count:
-                base = max(base, 0.45 + min(total_pulse_count, 5) * 0.05)
-            return "Medium", min(base, 0.7)
-
-        # # Otherwise Low
-        # return "Low", 0.15
-
-        # No useful threat intelligence data found
-        if total_pulse_count == 0 and (max_abuse_confidence is None or max_abuse_confidence == 0):
-            return "Unknown", 0.0
-
-        # Otherwise Low
-        return "Low", 0.15
-    
     def _validate_indicator(self, value: str) -> Optional[ThreatIndicator]:
         """Validate and determine the type of threat indicator"""
         value = value.strip()
